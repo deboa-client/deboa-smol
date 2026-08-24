@@ -1,6 +1,6 @@
 # deboa-smol
 
-[![Crates.io downloads](https://img.shields.io/crates/d/deboa-smol)](https://crates.io/crates/deboa-smol) [![crates.io](https://img.shields.io/crates/v/deboa-smol?style=flat-square)](https://crates.io/crates/deboa-smol) [![Build Status](https://github.com/ararog/deboa/actions/workflows/rust.yml/badge.svg?event=push)](https://github.com/ararog/deboa/actions/workflows/rust.yml) ![Crates.io MSRV](https://img.shields.io/crates/msrv/deboa-smol) [![Documentation](https://docs.rs/deboa-smol/badge.svg)](https://docs.rs/deboa-smol/latest/deboa-smol) [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ararog/deboa/blob/main/LICENSE.md)  [![codecov](https://codecov.io/gh/ararog/deboa/graph/badge.svg?token=T0HSBAPVSI)](https://codecov.io/gh/ararog/deboa)
+[![Crates.io downloads](https://img.shields.io/crates/d/deboa-smol)](https://crates.io/crates/deboa-smol) [![crates.io](https://img.shields.io/crates/v/deboa-smol?style=flat-square)](https://crates.io/crates/deboa-smol) [![Build Status](https://github.com/deboa-client/deboa/actions/workflows/rust.yml/badge.svg?event=push)](https://github.com/deboa-client/deboa-smol/actions/workflows/rust.yml) ![Crates.io MSRV](https://img.shields.io/crates/msrv/deboa-smol) [![Documentation](https://docs.rs/deboa-smol/badge.svg)](https://docs.rs/deboa-smol/latest/deboa-smol) [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/deboa-client/deboa-smol/blob/main/LICENSE.md)  [![codecov](https://codecov.io/gh/deboa-client/deboa-smol/graph/badge.svg?token=T0HSBAPVSI)](https://codecov.io/gh/deboa-client/deboa-smol)
 
 ## Description
 
@@ -8,7 +8,7 @@
 
 ## Attention
 
-This release has a major api change. Please check the [migration guide](https://github.com/ararog/deboa/blob/main/MIGRATION_GUIDE.md) for more information.
+This release has a major api change. Please check the [migration guide](https://github.com/deboa-client/deboa/blob/main/MIGRATION_GUIDE.md) for more information.
 
 ## Features
 
@@ -148,7 +148,7 @@ async fn main() -> Result<()> {
 
 You can create a new project from the template using `cargo generate`:
 
-`cargo generate ararog/deboa-templates`
+`cargo generate deboa-client/deboa-templates`
 
 ## License
 
