@@ -1,6 +1,11 @@
+//! DNS resolution for the Deboa HTTP client.
+//!
+//! This module provides DNS resolution functionality for the Deboa HTTP client.
+
 use deboa::{
-    dns::DnsResolver,
+    dns::{DnsResolver, DnsResponse},
     errors::{DeboaError::Dns, DnsError},
+    Result,
 };
 use rand::seq::SliceRandom;
 use smol::net::resolve;
@@ -11,7 +16,7 @@ use std::net::IpAddr;
 pub struct DefaultDnsResolver;
 
 impl DnsResolver for DefaultDnsResolver {
-    async fn resolve(&self, host: String, port: u16) -> deboa::Result<Vec<IpAddr>> {
+    async fn resolve(&self, host: String, port: u16) -> Result<DnsResponse> {
         let hostname = format!("{}:{}", host, port);
         let addrs = resolve(hostname).await;
         if let Err(e) = addrs {
@@ -24,6 +29,9 @@ impl DnsResolver for DefaultDnsResolver {
             .map(|addr| addr.ip())
             .collect();
         ips.shuffle(&mut rand::rng());
-        Ok(ips)
+
+        Ok(DnsResponse::builder()
+            .addresses(ips)
+            .build())
     }
 }

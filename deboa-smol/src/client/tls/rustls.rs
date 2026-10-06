@@ -5,29 +5,10 @@ use deboa::{
     Result,
 };
 use rustls::{
-    crypto::CryptoProvider,
     pki_types::{CertificateDer, PrivateKeyDer},
     ClientConfig,
 };
-
-pub(crate) fn default_provider() -> CryptoProvider {
-    #[cfg(feature = "__rustls_aws_lc_rs")]
-    return rustls::crypto::aws_lc_rs::default_provider();
-    #[cfg(feature = "__rustls_ring")]
-    return rustls::crypto::ring::default_provider();
-}
-
-#[inline]
-pub(crate) fn alpn() -> Vec<Vec<u8>> {
-    vec![
-        #[cfg(feature = "http3")]
-        b"h3".to_vec(),
-        #[cfg(feature = "http2")]
-        b"h2".to_vec(),
-        #[cfg(feature = "http1")]
-        b"http/1.1".to_vec(),
-    ]
-}
+use std::sync::Arc;
 
 /// Builder for TLS connections using rustls
 pub struct TlsConnectionBuilder<'a> {
@@ -35,7 +16,6 @@ pub struct TlsConnectionBuilder<'a> {
     certificate: Option<&'a DeboaCertificate>,
     skip_server_verification: bool,
     alpn: Vec<Vec<u8>>,
-    provider: CryptoProvider,
 }
 
 impl Default for TlsConnectionBuilder<'_> {
@@ -44,20 +24,19 @@ impl Default for TlsConnectionBuilder<'_> {
             identity: None,
             certificate: None,
             skip_server_verification: false,
-            alpn: alpn(),
-            provider: default_provider(),
+            alpn: Vec::new(),
         }
     }
 }
 
 impl<'a> TlsConnectionBuilder<'a> {
-    /// Set the identity to use for the connection
+    /// Set identity to use with connection
     pub fn identity(mut self, identity: Option<&'a DeboaIdentity>) -> Self {
         self.identity = identity;
         self
     }
 
-    /// Set the certificate to use for the connection
+    /// Set certificate to use with connection
     pub fn certificate(mut self, certificate: Option<&'a DeboaCertificate>) -> Self {
         self.certificate = certificate;
         self
@@ -69,7 +48,7 @@ impl<'a> TlsConnectionBuilder<'a> {
         self
     }
 
-    /// Set the ALPN protocols to use for the connection
+    /// Set the ALPN protocols this client has support to
     pub fn alpn(mut self, alpn: Vec<Vec<u8>>) -> Self {
         self.alpn = alpn;
         self
@@ -81,20 +60,16 @@ impl<'a> TlsConnectionBuilder<'a> {
             if self.skip_server_verification {
                 ClientConfig::builder()
                     .dangerous()
-                    .with_custom_certificate_verifier(
-                        deboa_tls::rust::verify::SkipServerVerification::new(self.provider),
-                    )
+                    .with_custom_certificate_verifier(Arc::new(
+                        deboa_tls::rustls::verify::SkipServerVerification::default(),
+                    ))
                     .with_no_client_auth()
             } else {
+                // TODO: Add support to ECH
+
                 #[cfg(feature = "__webpki_rustls_verifier")]
                 let config = {
-                    let config = ClientConfig::builder_with_provider(self.provider.into())
-                        .with_protocol_versions(rustls::ALL_VERSIONS)
-                        .map_err(|e| {
-                            DeboaError::Connection(ConnectionError::Tls {
-                                message: format!("Failed to set TLS version: {}", e),
-                            })
-                        })?;
+                    let config = ClientConfig::builder_with_protocol_versions(rustls::ALL_VERSIONS);
 
                     let mut root_store =
                         rustls::RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.to_vec() };
@@ -129,14 +104,13 @@ impl<'a> TlsConnectionBuilder<'a> {
                 #[cfg(feature = "__platform_rustls_verifier")]
                 let config = {
                     use rustls_platform_verifier::BuilderVerifierExt;
-                    rustls::ClientConfig::builder_with_provider(default_provider())
-                        .with_protocol_versions(rustls::ALL_VERSIONS)
+                    rustls::ClientConfig::builder_with_protocol_versions(rustls::ALL_VERSIONS)
+                        .with_platform_verifier()
                         .map_err(|e| {
                             DeboaError::Connection(ConnectionError::Tls {
-                                message: format!("Failed to set TLS version: {}", e),
+                                message: format!("Failed to load platform verifier: {}", e),
                             })
                         })?
-                        .with_platform_verifier()
                 };
 
                 let mut config = if let Some(id) = self.identity {
@@ -171,61 +145,90 @@ impl<'a> TlsConnectionBuilder<'a> {
     }
 }
 
-#[cfg(any(feature = "http1", feature = "http2"))]
 /// TCP connection module for TLS
 pub mod tcp {
+    use crate::{
+        cert::{DeboaCertificate, DeboaIdentity},
+        client::{http::conn::plain_stream_connect, tls::rustls::TlsConnectionBuilder},
+        rt::stream::SmolStream,
+    };
     use deboa::{
+        conn::ConnectionConfig,
         errors::{ConnectionError, DeboaError},
         Result,
     };
-    use futures_rustls::{client::TlsStream, TlsConnector};
-    use rustls::ClientConfig;
     use rustls_pki_types::ServerName;
-    use smol::net::TcpStream;
-    use std::sync::Arc;
+    use std::{net::IpAddr, sync::Arc};
+    use futures_rustls::TlsConnector;
 
-    /// Establish a TLS connection over TCP
-    pub async fn connect(
-        config: ClientConfig,
-        inner_stream: TcpStream,
-        host: &str,
-    ) -> Result<TlsStream<TcpStream>> {
-        let connector = TlsConnector::from(Arc::new(config));
+    /// Connect to a TCP TLS stream
+    pub async fn connect<'a>(
+        ip: &IpAddr,
+        config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
+    ) -> Result<SmolStream> {
+        let tcp_stream = plain_stream_connect(ip, config.port()).await?;
 
-        let hostname = ServerName::try_from(host.to_string())
-            .map_err(|e| DeboaError::Connection(ConnectionError::Tls { message: e.to_string() }))?;
+        let tls_config = TlsConnectionBuilder::default()
+            .certificate(config.certificate())
+            .identity(config.identity())
+            .build_config()?;
 
-        connector
-            .connect(hostname, inner_stream)
+        let connector = TlsConnector::from(Arc::new(tls_config));
+
+        let hostname = ServerName::try_from(
+            config
+                .host()
+                .to_string(),
+        )
+        .map_err(|e| DeboaError::Connection(ConnectionError::Tls { message: e.to_string() }))?;
+
+        let tls_stream = connector
+            .connect(hostname, tcp_stream)
             .await
             .map_err(|e| {
                 DeboaError::Connection(ConnectionError::Tls {
                     message: format!("Could not connect to server: {}", e),
                 })
-            })
+            })?;
+
+        Ok(SmolStream::Tls(Box::new(tls_stream)))
     }
 }
 
 #[cfg(feature = "http3")]
 /// UDP connection module for TLS
 pub mod udp {
+    use crate::{
+        cert::{DeboaCertificate, DeboaIdentity},
+        client::tls::rustls::TlsConnectionBuilder,
+    };
     use deboa::{
+        conn::ConnectionConfig,
         errors::{ConnectionError, DeboaError},
         Result,
     };
     use h3_quinn::Connection;
-    use quinn::{crypto::rustls::QuicClientConfig, Endpoint};
-    use rustls::ClientConfig;
-    use std::{net::SocketAddr, sync::Arc};
+    use quinn::crypto::rustls::QuicClientConfig;
+    use quinn::Endpoint;
+    use std::{
+        net::{IpAddr, SocketAddr},
+        sync::Arc,
+    };
 
-    /// Establish a TLS connection over UDP
-    pub async fn connect(
-        config: ClientConfig,
-        endpoint: &mut Endpoint,
-        socket_addr: SocketAddr,
-        host: &str,
+    /// Connect to a Quic TLS stream
+    pub async fn connect<'a>(
+        ip: &IpAddr,
+        config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
     ) -> Result<Connection> {
-        let quic_config = QuicClientConfig::try_from(config).map_err(|e| {
+        let mut endpoint = Endpoint::client(SocketAddr::new(*config.client_bind_addr(), 0))
+            .map_err(|e| DeboaError::Connection(ConnectionError::Udp { message: e.to_string() }))?;
+
+        let tls_config = TlsConnectionBuilder::default()
+            .certificate(config.certificate())
+            .identity(config.identity())
+            .build_config()?;
+
+        let quic_config = QuicClientConfig::try_from(tls_config).map_err(|e| {
             DeboaError::Connection(ConnectionError::Tls {
                 message: format!("Could not create QUIC client config: {}", e),
             })
@@ -235,7 +238,7 @@ pub mod udp {
         endpoint.set_default_client_config(client_config);
 
         let conn = endpoint
-            .connect(socket_addr, host)
+            .connect(SocketAddr::new(*ip, config.port()), config.host())
             .map_err(|e| {
                 DeboaError::Connection(ConnectionError::Udp {
                     message: format!("Could not connect to server: {}", e),

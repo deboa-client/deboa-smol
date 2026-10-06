@@ -16,15 +16,18 @@
 //! - Thread-safe connection handling
 //! ```
 use crate::cert::{DeboaCertificate, DeboaIdentity};
-#[cfg(any(feature = "http1", feature = "http2"))]
+#[cfg(feature = "native-tls")]
+use crate::client::tls;
+#[cfg(feature = "rust-tls")]
+use crate::client::tls::rustls::tcp::connect as tls_connect;
+#[cfg(feature = "http3")]
+use crate::client::tls::rustls::udp::connect as quinn_connect;
 use crate::rt::stream::SmolStream;
-#[cfg(feature = "http1")]
 use deboa::request::Http1Request;
 #[cfg(feature = "http2")]
 use deboa::request::Http2Request;
 use deboa::{
     conn::{ConnectionConfig, HttpConnectionDispatcher, ProtoConnection},
-    dns::DnsResolver,
     errors::{ConnectionError, DeboaError, RequestError},
     response::DeboaResponse,
     Result,
@@ -34,10 +37,8 @@ use deboa_h3::generic::Http3Request;
 use futures_timeout::TimeoutFutureExt;
 use http::{Request, Version};
 use hyper_body_utils::HttpBody;
-use log::info;
-#[cfg(any(feature = "http1", feature = "http2"))]
+use std::{error::Error, marker::PhantomData, net::IpAddr, time::Duration};
 use smol::net::TcpStream;
-use std::{borrow::Cow, marker::PhantomData, time::Duration};
 
 /// Connection pooling for efficient HTTP connections.
 ///
@@ -52,29 +53,11 @@ use std::{borrow::Cow, marker::PhantomData, time::Duration};
 /// - Configurable pool size (coming soon)
 pub mod pool;
 
-#[cfg(feature = "http1")]
 pub(crate) type Http1Connection = BaseHttpConnection<Http1Request, HttpBody, HttpBody>;
 #[cfg(feature = "http2")]
 pub(crate) type Http2Connection = BaseHttpConnection<Http2Request, HttpBody, HttpBody>;
 #[cfg(feature = "http3")]
 pub(crate) type Http3Connection = BaseHttpConnection<Http3Request, HttpBody, HttpBody>;
-
-/// Struct that represents the connection.
-///
-/// # Fields
-///
-/// * `sender` - The sender to use.
-pub struct BaseHttpConnection<Sender, ReqBody, ResBody> {
-    pub(crate) sender: Sender,
-    pub(crate) req_body: PhantomData<ReqBody>,
-    pub(crate) res_body: PhantomData<ResBody>,
-}
-
-impl<Sender, ReqBody, ResBody> BaseHttpConnection<Sender, ReqBody, ResBody> {
-    pub(crate) fn new(sender: Sender) -> Self {
-        Self { sender, req_body: PhantomData, res_body: PhantomData }
-    }
-}
 
 /// Enum that represents the connection type.
 ///
@@ -84,19 +67,17 @@ impl<Sender, ReqBody, ResBody> BaseHttpConnection<Sender, ReqBody, ResBody> {
 /// * `Http2` - The HTTP/2 connection.
 /// * `Http3` - The HTTP/3 connection.
 pub enum DeboaConnection {
-    /// HTTP/1.1 connection
-    #[cfg(feature = "http1")]
+    /// HTTP/1.1 connection.
     Http1(Box<Http1Connection>),
-    /// HTTP/2 connection
+    /// HTTP/2 connection.
     #[cfg(feature = "http2")]
     Http2(Box<Http2Connection>),
-    /// HTTP/3 connection
+    /// HTTP/3 connection.
     #[cfg(feature = "http3")]
     Http3(Box<Http3Connection>),
 }
 
 impl DeboaConnection {
-    #[cfg(feature = "http1")]
     /// Initialize a new HTTP/1.1 connection
     pub fn http1(conn: Http1Connection) -> Self {
         DeboaConnection::Http1(Box::new(conn))
@@ -116,21 +97,18 @@ impl DeboaConnection {
 
     async fn send(&mut self, request: Request<HttpBody>) -> Result<DeboaResponse> {
         match self {
-            #[cfg(feature = "http1")]
             DeboaConnection::Http1(ref mut conn) => {
                 let (parts, body) = conn
                     .sender
                     .send_request(request)
                     .await
                     .map_err(|e| {
+                        println!("Error: {:?}", e.source());
                         DeboaError::Request(RequestError::Send { message: e.to_string() })
                     })?
                     .into_parts();
 
-                Ok(DeboaResponse::new(http::Response::from_parts(
-                    parts,
-                    HttpBody::from_incoming(body),
-                )))
+                Ok(DeboaResponse::new(http::Response::from_parts(parts, HttpBody::incoming(body))))
             }
             #[cfg(feature = "http2")]
             DeboaConnection::Http2(ref mut conn) => {
@@ -143,10 +121,7 @@ impl DeboaConnection {
                     })?
                     .into_parts();
 
-                Ok(DeboaResponse::new(http::Response::from_parts(
-                    parts,
-                    HttpBody::from_incoming(body),
-                )))
+                Ok(DeboaResponse::new(http::Response::from_parts(parts, HttpBody::incoming(body))))
             }
             #[cfg(feature = "http3")]
             DeboaConnection::Http3(ref mut conn) => {
@@ -169,7 +144,7 @@ impl DeboaConnection {
 }
 
 impl HttpConnectionDispatcher for DeboaConnection {
-    /// Send a request through the connection.
+    /// Send a request over the connection.
     ///
     /// # Arguments
     ///
@@ -178,7 +153,7 @@ impl HttpConnectionDispatcher for DeboaConnection {
     ///
     /// # Returns
     ///
-    /// * `Result<DeboaResponse>` - The response from the server.
+    /// * `Result<DeboaResponse>` - The response or error.
     async fn send_request(
         &mut self,
         request: Request<HttpBody>,
@@ -193,190 +168,119 @@ impl HttpConnectionDispatcher for DeboaConnection {
     }
 }
 
-#[cfg(feature = "rust-tls")]
-async fn connect_with_rustls<'a>(
-    tcp_stream: TcpStream,
-    config: &ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
-) -> Result<(Version, SmolStream)> {
-    use crate::client::tls::rustls::{tcp::connect, TlsConnectionBuilder};
-    let tls_config = TlsConnectionBuilder::default()
-        .certificate(config.certificate())
-        .identity(config.identity())
-        .build_config()?;
+/// Struct that represents the connection.
+///
+/// # Fields
+///
+/// * `sender` - The sender to use.
+pub struct BaseHttpConnection<Sender, ReqBody, ResBody> {
+    pub(crate) sender: Sender,
+    pub(crate) req_body: PhantomData<ReqBody>,
+    pub(crate) res_body: PhantomData<ResBody>,
+}
 
-    let stream = Box::new(connect(tls_config, tcp_stream, config.host()).await?);
-
-    if let Some(alpn) = stream
-        .get_ref()
-        .1
-        .alpn_protocol()
-    {
-        let Cow::Borrowed(alpn_code) = String::from_utf8_lossy(alpn) else {
-            return Err(DeboaError::Connection(ConnectionError::Tcp {
-                message: "Invalid ALPN code".to_string(),
-            }));
-        };
-
-        let version = match alpn_code {
-            "http1.1" => Version::HTTP_11,
-            "h2" => Version::HTTP_2,
-            "h3" => Version::HTTP_3,
-            _ => *config.protocol_version(),
-        };
-
-        info!("ALPN info found, switching connection to {:?}", version);
-        Ok((version, SmolStream::Tls(stream)))
-    } else {
-        info!("No ALPN info available, falling back to HTTP/1.1");
-        Ok((*config.protocol_version(), SmolStream::Tls(stream)))
+impl<Sender, ReqBody, ResBody> BaseHttpConnection<Sender, ReqBody, ResBody> {
+    pub(crate) fn new(sender: Sender) -> Self {
+        Self { sender, req_body: PhantomData, res_body: PhantomData }
     }
 }
 
-#[cfg(feature = "native-tls")]
-async fn connect_with_nativels<'a>(
-    tcp_stream: TcpStream,
+async fn create_connection<'a>(
+    ip: &IpAddr,
     config: &ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
-) -> Result<(Version, TokioStream)> {
-    use crate::client::tls::native::TlsConnectionBuilder;
-    let stream = TlsConnectionBuilder::new(tcp_stream, config.host())
-        .certificate(config.certificate())
-        .identity(config.identity())
-        .connect()
-        .await?;
-
-    if let Some(alpn) = stream.negotiated_alpn() {
-        let Cow::Borrowed(alpn_code) = String::from_utf8_lossy(alpn) else {
-            return Err(DeboaError::Connection(ConnectionError::Tcp {
-                message: "Invalid ALPN code".to_string(),
-            }));
-        };
-
-        let version = match alpn_code {
-            "http1.1" => Version::HTTP_11,
-            "h2" => Version::HTTP_2,
-            "h3" => Version::HTTP_3,
-            _ => *config.protocol_version(),
-        };
-
-        info!("ALPN info found, switching connection to {:?}", version);
-        Ok((version, TokioStream::Tls(stream)))
-    } else {
-        info!("No ALPN info available, falling back to HTTP/1.1");
-        Ok((*config.protocol_version(), TokioStream::Tls(stream)))
+) -> Result<DeboaConnection> {
+    match config.scheme() {
+        "http" | "ws" => create_plain_connection(ip, config).await,
+        "https" | "wss" => create_secure_connection(ip, config).await,
+        &_ => {
+            panic!("Scheme not supported")
+        }
     }
 }
 
-/// Connection factory.
-pub struct ConnectionFactory {}
+// TODO: For now leave here, as I don't have plans to make more reusable than this
+pub(crate) async fn plain_stream_connect<'a>(ip: &IpAddr, port: u16) -> Result<TcpStream> {
+    let stream = TcpStream::connect(format!("{}:{}", ip, port))
+        .await
+        .map_err(|e| DeboaError::Connection(ConnectionError::Tcp { message: e.to_string() }))?;
 
-impl ConnectionFactory {
-    /// Create a new connection.
-    pub async fn create_connection<'a, D>(
-        config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
-        dns_resolver: &D,
-    ) -> Result<DeboaConnection>
-    where
-        D: DnsResolver,
-    {
-        let ips = dns_resolver
-            .resolve(
-                config
-                    .host()
-                    .to_string(),
-                config.port(),
-            )
-            .await?;
-        let ips = if config
-            .client_bind_addr()
-            .is_ipv4()
-        {
-            ips.into_iter()
-                .filter(|ip| ip.is_ipv4())
-                .collect::<Vec<_>>()
-        } else {
-            ips.into_iter()
-                .filter(|ip| ip.is_ipv6())
-                .collect::<Vec<_>>()
-        };
+    Ok(stream)
+}
 
-        let Some(ip) = ips.first() else {
-            return Err(DeboaError::Request(RequestError::Send {
-                message: format!("No IP addresses found for hostname: {}", config.host()),
-            }));
-        };
-
-        #[cfg(any(feature = "http1", feature = "http2"))]
-        let conn_pair = {
-            let tcp_stream = smol::net::TcpStream::connect(format!("{}:{}", ip, config.port()))
-                .await
-                .map_err(|e| {
-                    DeboaError::Connection(ConnectionError::Tcp { message: e.to_string() })
-                })?;
-            let use_tls = config.scheme() == "https" || config.scheme() == "wss";
-            if !use_tls {
-                (Version::HTTP_11, SmolStream::Plain(tcp_stream))
-            } else {
-                #[cfg(feature = "rust-tls")]
-                {
-                    connect_with_rustls(tcp_stream, config).await?
-                }
-
-                #[cfg(feature = "native-tls")]
-                {
-                    connect_with_nativels(tcp_stream, config).await?
-                }
-            }
-        };
-
-        let conn = match conn_pair.0 {
-            #[cfg(feature = "http1")]
-            Version::HTTP_11 => {
-                let conn = Http1Connection::connect(conn_pair.1).await?;
-                DeboaConnection::http1(conn)
-            }
+/// Create a new plain connection.
+pub async fn create_plain_connection<'a>(
+    ip: &IpAddr,
+    config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
+) -> Result<DeboaConnection> {
+    let stream = SmolStream::Plain(plain_stream_connect(ip, config.port()).await?);
+    let conn = if !config.prior_knowledge() {
+        DeboaConnection::http1(Http1Connection::connect(stream).await?)
+    } else {
+        match *config.protocol_version() {
+            Version::HTTP_11 => DeboaConnection::http1(Http1Connection::connect(stream).await?),
             #[cfg(feature = "http2")]
-            Version::HTTP_2 => {
-                let conn = Http2Connection::connect(conn_pair.1).await?;
-                DeboaConnection::http2(conn)
-            }
-            #[cfg(feature = "http3")]
-            Version::HTTP_3 => {
-                let stream = {
-                    use crate::client::tls::rustls::{udp::connect, TlsConnectionBuilder};
-                    use deboa::errors::ConnectionError;
-                    use quinn::Endpoint;
-                    use std::net::SocketAddr;
-
-                    let mut client_endpoint = Endpoint::client(SocketAddr::new(
-                        *config.client_bind_addr(),
-                        0,
-                    ))
-                    .map_err(|e| {
-                        DeboaError::Connection(ConnectionError::Udp { message: e.to_string() })
-                    })?;
-
-                    let tls_config = TlsConnectionBuilder::default()
-                        .certificate(config.certificate())
-                        .identity(config.identity())
-                        .build_config()?;
-
-                    connect(
-                        tls_config,
-                        &mut client_endpoint,
-                        SocketAddr::new(*ip, config.port()),
-                        config.host(),
-                    )
-                    .await?
-                };
-
-                let conn = Http3Connection::connect(stream).await?;
-                DeboaConnection::http3(conn)
-            }
+            Version::HTTP_2 => DeboaConnection::http2(Http2Connection::connect(stream).await?),
             _ => {
                 return Err(DeboaError::UnsupportedProtocol);
             }
-        };
+        }
+    };
 
-        Ok(conn)
-    }
+    Ok(conn)
+}
+
+// TODO: NativeTls is the açternative SecureConnection implementation which can be provided to client
+#[cfg(feature = "native-tls")]
+/// Create a new connection..into()
+pub async fn create_secure_connection<'a>(
+    ip: &IpAddr,
+    config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
+) -> Result<DeboaConnection> {
+    let tls_stream = tls::native::connect(*ip, config).await?;
+    let conn = if !config.prior_knowledge() {
+        // TODO: Restore Native TLS support
+        DeboaConnection::http1(Http1Connection::connect(tls_stream).await?)
+    } else {
+        match *config.protocol_version() {
+            Version::HTTP_11 => DeboaConnection::http1(Http1Connection::connect(tls_stream).await?),
+            #[cfg(feature = "http2")]
+            Version::HTTP_2 => DeboaConnection::http2(Http2Connection::connect(tls_stream).await?),
+            _ => {
+                return Err(DeboaError::UnsupportedProtocol);
+            }
+        }
+    };
+
+    Ok(conn)
+}
+
+// TODO: Rustls is the default SecureConnection implementation, but no ALPN handling
+#[cfg(feature = "rust-tls")]
+/// Create a new connection.
+pub async fn create_secure_connection<'a>(
+    ip: &IpAddr,
+    config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
+) -> Result<DeboaConnection> {
+    let conn = if !config.prior_knowledge() {
+        DeboaConnection::http1(Http1Connection::connect(tls_connect(ip, config).await?).await?)
+    } else {
+        match *config.protocol_version() {
+            Version::HTTP_11 => DeboaConnection::http1(
+                Http1Connection::connect(tls_connect(ip, config).await?).await?,
+            ),
+            #[cfg(feature = "http2")]
+            Version::HTTP_2 => DeboaConnection::http2(
+                Http2Connection::connect(tls_connect(ip, config).await?).await?,
+            ),
+            #[cfg(feature = "http3")]
+            Version::HTTP_3 => DeboaConnection::http3(
+                Http3Connection::connect(quinn_connect(ip, config).await?).await?,
+            ),
+            _ => {
+                return Err(DeboaError::UnsupportedProtocol);
+            }
+        }
+    };
+
+    Ok(conn)
 }

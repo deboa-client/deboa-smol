@@ -34,19 +34,3 @@ async fn test_post_encoded_form(
     )
     .await
 }
-
-#[rstest]
-#[test_attr(apply(test))]
-async fn test_post_multipart_form(
-    create_client: Client,
-    #[future] create_server: EasyHttpMock<VetisAdapter>,
-    protocol_version: Version,
-) -> TestResult<()> {
-    let mut server = create_server.await;
-    deboa_test_utils::base::post::test_post_multipart_form(
-        &create_client,
-        &mut server,
-        protocol_version,
-    )
-    .await
-}

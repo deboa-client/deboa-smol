@@ -1,24 +1,16 @@
 //! TLS implementation using native-tls
-
-use crate::cert::{DeboaCertificate, DeboaIdentity};
-use async_native_tls::{Certificate, Identity, TlsConnector, TlsStream};
+use crate::{
+    cert::{DeboaCertificate, DeboaIdentity},
+    client::http::conn::plain_stream_connect,
+    rt::stream::SmolStream
+};
+use async_native_tls_ext::{Certificate, Identity, TlsConnector, TlsStream};
 use deboa::{
+    conn::ConnectionConfig,
     errors::{ConnectionError, DeboaError},
     Result,
 };
 use smol::net::TcpStream;
-
-#[inline]
-pub(crate) fn alpn() -> &'static [&'static str] {
-    &[
-        #[cfg(feature = "http3")]
-        "h3",
-        #[cfg(feature = "http2")]
-        "h2",
-        #[cfg(feature = "http1")]
-        "http/1.1",
-    ]
-}
 
 /// Builder for TLS connections using native-tls
 pub struct TlsConnectionBuilder<'a> {
@@ -122,4 +114,19 @@ impl<'a> TlsConnectionBuilder<'a> {
 
         stream
     }
+}
+
+pub async fn connect<'a>(
+    ip: IpAddr,
+    config: &ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
+) -> Result<SmolStream> {
+    let tcp_stream = plain_stream_connect(&ip, config.port()).await?;
+
+    let stream = TlsConnectionBuilder::new(tcp_stream, config.host())
+        .certificate(config.certificate())
+        .identity(config.identity())
+        .connect()
+        .await?;
+
+    Ok(SmolStream::Tls(stream))
 }
