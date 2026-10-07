@@ -157,9 +157,9 @@ pub mod tcp {
         errors::{ConnectionError, DeboaError},
         Result,
     };
+    use futures_rustls::TlsConnector;
     use rustls_pki_types::ServerName;
     use std::{net::IpAddr, sync::Arc};
-    use futures_rustls::TlsConnector;
 
     /// Connect to a TCP TLS stream
     pub async fn connect<'a>(

@@ -2,7 +2,7 @@
 use crate::{
     cert::{DeboaCertificate, DeboaIdentity},
     client::http::conn::plain_stream_connect,
-    rt::stream::SmolStream
+    rt::stream::SmolStream,
 };
 use async_native_tls_ext::{Certificate, Identity, TlsConnector, TlsStream};
 use deboa::{

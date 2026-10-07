@@ -37,8 +37,8 @@ use deboa_h3::generic::Http3Request;
 use futures_timeout::TimeoutFutureExt;
 use http::{Request, Version};
 use hyper_body_utils::HttpBody;
-use std::{error::Error, marker::PhantomData, net::IpAddr, time::Duration};
 use smol::net::TcpStream;
+use std::{error::Error, marker::PhantomData, net::IpAddr, time::Duration};
 
 /// Connection pooling for efficient HTTP connections.
 ///
