@@ -30,12 +30,14 @@ impl ProtoConnection for Http3Connection {
             .await
             .map_err(|e| DeboaError::Connection(ConnectionError::Udp { message: e.to_string() }))?;
 
-        smol::spawn(async move {
-            future::poll_fn(|cx| conn.poll_close(cx)).await;
-            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-        })
-        .detach();
+        let handle = smol::spawn(async move {
+            let error = future::poll_fn(|cx| conn.poll_close(cx)).await;
+            if ! error.is_h3_no_error() {
+                return Err(DeboaError::Connection(ConnectionError::Udp { message: error.to_string() }))
+            }
+            Ok(())
+        });
 
-        Ok(BaseHttpConnection::new(SendRequest::new(sender)))
+        Ok(BaseHttpConnection::new(SendRequest::new(sender), handle))
     }
 }

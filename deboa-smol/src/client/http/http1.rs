@@ -35,19 +35,12 @@ impl ProtoConnection for Http1Connection {
                 DeboaError::Connection(ConnectionError::Handshake { message: e.to_string() })
             })?;
 
-        smol::spawn(async move {
-            match conn
+        let handle = smol::spawn(async move {
+            conn
                 .with_upgrades()
-                .await
-            {
-                Ok(_) => (),
-                Err(err) => {
-                    log::error!("Error: {:#}", err)
-                }
-            };
-        })
-        .detach();
+                .await.map_err(|e | DeboaError::Connection(ConnectionError::Tcp { message: e.to_string() }))
+        });
 
-        Ok(BaseHttpConnection::new(sender))
+        Ok(BaseHttpConnection::new(sender, handle))
     }
 }

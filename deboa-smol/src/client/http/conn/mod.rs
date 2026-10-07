@@ -37,7 +37,7 @@ use deboa_h3::generic::Http3Request;
 use futures_timeout::TimeoutFutureExt;
 use http::{Request, Version};
 use hyper_body_utils::HttpBody;
-use smol::net::TcpStream;
+use smol::{Task, net::TcpStream};
 use std::{error::Error, marker::PhantomData, net::IpAddr, time::Duration};
 
 /// Connection pooling for efficient HTTP connections.
@@ -175,13 +175,14 @@ impl HttpConnectionDispatcher for DeboaConnection {
 /// * `sender` - The sender to use.
 pub struct BaseHttpConnection<Sender, ReqBody, ResBody> {
     pub(crate) sender: Sender,
+    pub(crate) handle: Task<Result<()>>,
     pub(crate) req_body: PhantomData<ReqBody>,
     pub(crate) res_body: PhantomData<ResBody>,
 }
 
 impl<Sender, ReqBody, ResBody> BaseHttpConnection<Sender, ReqBody, ResBody> {
-    pub(crate) fn new(sender: Sender) -> Self {
-        Self { sender, req_body: PhantomData, res_body: PhantomData }
+    pub(crate) fn new(sender: Sender, handle: Task<Result<()>>) -> Self {
+        Self { sender, handle, req_body: PhantomData, res_body: PhantomData }
     }
 }
 
