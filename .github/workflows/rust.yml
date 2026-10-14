@@ -61,5 +61,4 @@ jobs:
       - name: Run deboa-smol tests on ${{ matrix.os }} with ${{ matrix.protocol }} using ${{ matrix.tls }}
         if: (matrix.os != 'windows-latest' && matrix.tls != 'native-tls') || (matrix.os != 'macos-latest' && matrix.tls != 'native-tls')
         run: |
-          cd deboa-smol
           cargo nextest run --no-fail-fast --features "${{ matrix.protocol }} ${{ matrix.tls }} ${{ matrix.tls == 'rust-tls' && 'default-rustls-provider' || '' }} ${{ matrix.tls == 'rust-tls' && 'default-rustls-verifier' || '' }} easyhttpmock-vetis-smol/${{ matrix.protocol }} easyhttpmock-vetis-smol/rust-tls" --no-default-features
