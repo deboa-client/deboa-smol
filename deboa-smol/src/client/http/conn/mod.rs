@@ -97,7 +97,7 @@ impl DeboaConnection {
 
     async fn send(&mut self, request: Request<HttpBody>) -> Result<DeboaResponse> {
         match self {
-            DeboaConnection::Http1(ref mut conn) => {
+            DeboaConnection::Http1(conn) => {
                 let (parts, body) = conn
                     .sender
                     .send_request(request)
@@ -110,7 +110,7 @@ impl DeboaConnection {
                 Ok(DeboaResponse::new(http::Response::from_parts(parts, HttpBody::incoming(body))))
             }
             #[cfg(feature = "http2")]
-            DeboaConnection::Http2(ref mut conn) => {
+            DeboaConnection::Http2(conn) => {
                 let (parts, body) = conn
                     .sender
                     .send_request(request)
@@ -123,7 +123,7 @@ impl DeboaConnection {
                 Ok(DeboaResponse::new(http::Response::from_parts(parts, HttpBody::incoming(body))))
             }
             #[cfg(feature = "http3")]
-            DeboaConnection::Http3(ref mut conn) => {
+            DeboaConnection::Http3(conn) => {
                 let response = conn
                     .sender
                     .send_request(request)
