@@ -27,8 +27,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          token: ${{ secrets.CHECKOUT_SUBMODULES_TOKEN }}
-          submodules: "recursive"              
+          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: true              
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
