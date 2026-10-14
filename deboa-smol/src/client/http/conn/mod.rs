@@ -38,7 +38,7 @@ use futures_timeout::TimeoutFutureExt;
 use http::{Request, Version};
 use hyper_body_utils::HttpBody;
 use smol::{Task, net::TcpStream};
-use std::{error::Error, marker::PhantomData, net::IpAddr, time::Duration};
+use std::{marker::PhantomData, net::IpAddr, time::Duration};
 
 /// Connection pooling for efficient HTTP connections.
 ///
@@ -103,7 +103,6 @@ impl DeboaConnection {
                     .send_request(request)
                     .await
                     .map_err(|e| {
-                        println!("Error: {:?}", e.source());
                         DeboaError::Request(RequestError::Send { message: e.to_string() })
                     })?
                     .into_parts();
@@ -199,7 +198,6 @@ async fn create_connection<'a>(
     }
 }
 
-// TODO: For now leave here, as I don't have plans to make more reusable than this
 pub(crate) async fn plain_stream_connect<'a>(ip: &IpAddr, port: u16) -> Result<TcpStream> {
     let stream = TcpStream::connect(format!("{}:{}", ip, port))
         .await
@@ -230,7 +228,6 @@ pub async fn create_plain_connection<'a>(
     Ok(conn)
 }
 
-// TODO: NativeTls is the açternative SecureConnection implementation which can be provided to client
 #[cfg(feature = "native-tls")]
 /// Create a new connection..into()
 pub async fn create_secure_connection<'a>(
@@ -239,7 +236,6 @@ pub async fn create_secure_connection<'a>(
 ) -> Result<DeboaConnection> {
     let tls_stream = tls::native::connect(*ip, config).await?;
     let conn = if !config.prior_knowledge() {
-        // TODO: Restore Native TLS support
         DeboaConnection::http1(Http1Connection::connect(tls_stream).await?)
     } else {
         match *config.protocol_version() {
@@ -255,13 +251,12 @@ pub async fn create_secure_connection<'a>(
     Ok(conn)
 }
 
-// TODO: Rustls is the default SecureConnection implementation, but no ALPN handling
 #[cfg(feature = "rust-tls")]
 /// Create a new connection.
 pub async fn create_secure_connection<'a>(
     ip: &IpAddr,
     config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
-) -> Result<DeboaConnection> {
+) -> Result<DeboaConnection> {     
     let conn = if !config.prior_knowledge() {
         DeboaConnection::http1(Http1Connection::connect(tls_connect(ip, config).await?).await?)
     } else {
