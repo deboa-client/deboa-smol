@@ -156,7 +156,7 @@ async fn test_get_invalid_server(
     #[future] create_server: EasyHttpMock<VetisAdapter>,
     protocol_version: http::Version,
 ) -> TestResult<()> {
-    deboa_test_utils::base::get::test_get_invalid_server(&create_client).await
+    deboa_test_utils::base::get::test_get_invalid_server(&create_client, protocol_version).await
 }
 
 //
@@ -178,109 +178,22 @@ async fn test_get_by_query(
     .await
 }
 
-/*
-async fn do_get_by_query_with_retries() -> Result<()> {
-    let mut server = start_mock_server(|_req| async move {
-        Ok(make_response(StatusCode::BAD_GATEWAY, "pong"))
-    })
-    .await;
-
-    let client = create_client();
-
-    let response = DeboaRequest::get(server.url("/comments/1"))?
-        .retries(2)
-        .send_with(client)
-        .await;
-
-    if let Err(err) = response {
-        assert_eq!(
-            err,
-            DeboaError::Response(ResponseError::Receive {
-                status_code: StatusCode::BAD_GATEWAY,
-                message: "Could not process request (502 Bad Gateway): pong".to_string(),
-            }),
-        );
-    }
-
-    server.stop().await;
-
-    Ok(())
-}
-
-#[cfg(feature = "tokio-rt")]
-#[tokio::test]
-async fn test_get_by_query_with_retries() -> TestResult<()> {
-    do_get_by_query_with_retries().await
-}
-
-#[cfg(feature = "smol-rt")]
-#[rstest]
-#[test_attr(apply(test))]
-async fn test_get_by_query_with_retries() {
-    let _ = do_get_by_query_with_retries().await;
-}
-*/
-
-/*
-async fn do_get_with_redirect() -> Result<()> {
-    let client = Client::default();
-
-    let url = if cfg!(feature = "http3-tokio") {
-        "https://tinyurl.com/bccjpjd7"
-    } else {
-        "https://tinyurl.com/bp6e548"
-    };
-
-    let response = DeboaRequest::get(url)?
-        .send_with(client)
-        .await?;
-
-    let server = if cfg!(feature = "http3-tokio") { "facebook.com" } else { "github.com" };
-
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response
-            .headers()
-            .get("server")
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        server
-    );
-
-    Ok(())
-}
-
-#[cfg(feature = "tokio-rt")]
-#[tokio::test]
-async fn test_get_with_redirect() -> TestResult<()> {
-    do_get_with_redirect().await
-}
-
-#[cfg(feature = "smol-rt")]
-#[rstest]
-#[test_attr(apply(test))]
-async fn test_get_with_redirect() {
-    let _ = do_get_with_redirect().await;
-}
-*/
-
 #[rstest]
 #[test_attr(apply(test))]
 async fn test_try_into(
     create_client: Client,
     #[future] create_server: EasyHttpMock<VetisAdapter>,
+    protocol_version: http::Version,
 ) -> TestResult<()> {
-    deboa_test_utils::base::get::test_try_into(&create_client, &mut create_server.await).await
+    deboa_test_utils::base::get::test_try_into(&create_client, &mut create_server.await, protocol_version).await
 }
 
-/*
 #[rstest]
 #[test_attr(apply(test))]
 async fn test_fetch_from_str(
     create_client: Client,
     #[future] create_server: EasyHttpMock<VetisAdapter>,
+    protocol_version: http::Version,
 ) -> TestResult<()> {
-    deboa_test_utils::base::get::test_fetch_from_str(&create_client, &mut create_server.await).await
+    deboa_test_utils::base::get::test_fetch_from_str(&create_client, &mut create_server.await, protocol_version).await
 }
-*/
