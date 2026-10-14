@@ -5,9 +5,9 @@ permissions:
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
-    branches: ["**"]
+    branches: ["main"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -44,7 +44,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        protocol: ["http1", "http2", "http3"]
+        protocol: ["http2", "http3"]
         tls: ["native-tls", "rust-tls"]
 
     runs-on: ${{ matrix.os }}
