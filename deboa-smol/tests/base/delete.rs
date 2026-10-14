@@ -1,5 +1,5 @@
 #![allow(unused_variables)]
-use crate::common::helpers::{create_client, create_server};
+use crate::common::helpers::{create_client, create_server, protocol_version};
 use deboa::TestResult;
 use deboa_smol::Client;
 use easyhttpmock_vetis_smol::{vetis_adapter::VetisAdapter, EasyHttpMock};
@@ -12,7 +12,8 @@ use smol_macros::test;
 async fn test_delete(
     create_client: Client,
     #[future] create_server: EasyHttpMock<VetisAdapter>,
+    protocol_version: http::Version
 ) -> TestResult<()> {
     let mut server = create_server.await;
-    deboa_test_utils::base::delete::test_delete(&create_client, &mut server).await
+    deboa_test_utils::base::delete::test_delete(&create_client, &mut server, protocol_version).await
 }
