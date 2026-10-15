@@ -16,5 +16,5 @@ async fn test_patch(
     protocol_version: Version,
 ) -> TestResult<()> {
     let mut server = create_server.await;
-    deboa_test_utils::base::patch::test_patch(create_client, &mut server, protocol_version).await
+    deboa_test_utils::base::patch::test_patch(&create_client, &mut server, protocol_version).await
 }
