@@ -40,6 +40,7 @@ async fn test_get_http_skip_verification(
             deboa_test_utils::common::helpers::CA_CERT,
             ContentEncoding::DER,
         ))
+        .prior_knowledge(true)        
         .skip_cert_verification(true)
         .build();
 
@@ -59,6 +60,7 @@ async fn test_get_http_verify(
     protocol_version: http::Version,
 ) -> TestResult<()> {
     let client = Client::builder()
+        .prior_knowledge(true)
         .skip_cert_verification(false)
         .build();
 
@@ -91,6 +93,7 @@ async fn test_get_http_mutual_authentication(
             ContentEncoding::DER,
         ))
         .identity(identity)
+        .prior_knowledge(true)        
         .build();
 
     deboa_test_utils::base::get::test_get_http_mutual_authentication(
@@ -120,6 +123,7 @@ async fn test_get_http_mutual_authentication_with_password(
             ContentEncoding::DER,
         ))
         .identity(identity)
+        .prior_knowledge(true)        
         .build();
 
     deboa_test_utils::base::get::test_get_http_mutual_authentication(
