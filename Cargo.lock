@@ -409,9 +409,9 @@ dependencies = [
 
 [[package]]
 name = "combine"
-version = "4.6.8"
+version = "4.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfc320937d09e6de266b31b9afb480f197d7a861be86be7cb2ea7e5d1bfffc5e"
+checksum = "4356eba6976435498d05a311ee9fc486da3bc81c200d3f0d7dd9703b41913f92"
 dependencies = [
  "bytes",
  "memchr",
@@ -802,9 +802,9 @@ dependencies = [
 
 [[package]]
 name = "fory"
-version = "1.7.6"
+version = "1.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f03c5af87f4c7341f2e27f56bd3504d425c663d402e3aa9aa3dcda890e73f7"
+checksum = "f61037c8904dfb16de91b48d05f47cad944dacd5c9a09cba43aba3e74a74ec31"
 dependencies = [
  "fory-core",
  "fory-derive",
@@ -812,9 +812,9 @@ dependencies = [
 
 [[package]]
 name = "fory-core"
-version = "1.7.6"
+version = "1.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e1dc0451c539249ccdca57af6bb20d723768dee5557fb898da5b8e518305fa0"
+checksum = "07d0c722a372a8f1b602a29217ddbecd436f3cd0a869d3033d0ac0a4891b0f35"
 dependencies = [
  "byteorder",
  "num-bigint",
@@ -826,9 +826,9 @@ dependencies = [
 
 [[package]]
 name = "fory-derive"
-version = "1.7.6"
+version = "1.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ea48d8d0a3fbe59664c0aad8b5f11efa2399de05490c29dc9e633afc5baf0aa"
+checksum = "a38b6c29f8396eb2a90cdae00d698d1085ec2d275ef230de8fc1ccf1ec30dd06"
 dependencies = [
  "fory-core",
  "proc-macro-crate 1.3.1",
@@ -1442,9 +1442,9 @@ dependencies = [
 
 [[package]]
 name = "jsonpath-rust"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d23892d4caa103325a558250e9f4e406d81cf64f7c01679ae7a64e0413321e51"
+checksum = "b1c4668c489390e66d586fe2238ee8568473f7ac1607b411342f787c5e1bedd7"
 dependencies = [
  "pest",
  "pest_derive",
@@ -3362,18 +3362,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.62"
+version = "0.8.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86502bf56ac7c77571a32e2647bb2a15894565e981fb2a48d7bde2d91c965a9d"
+checksum = "e5fe1f8f1b06191a00962174c61aa5005e0bb391a6d80d07e24d115c01a92ed8"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.62"
+version = "0.8.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5457206954b06561e2608c7e19cf58b1926586d999c246eebe4502f7e2039d1a"
+checksum = "863ad3ac83293fb4d740aedbfdc9240dd8d1a50c1099acd76ce80ce7c7230c7f"
 dependencies = [
  "proc-macro2",
  "quote",
