@@ -5,7 +5,7 @@
 //! in the Deboa library.
 
 /// Connection management functionality for the Deboa HTTP client.
-pub mod conn;
+pub(crate) mod conn;
 
 pub(crate) mod http1;
 #[cfg(feature = "http2")]

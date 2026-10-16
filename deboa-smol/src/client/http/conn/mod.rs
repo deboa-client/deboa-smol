@@ -51,7 +51,7 @@ use std::{marker::PhantomData, net::IpAddr, time::Duration};
 /// - Connection lifecycle management
 /// - Thread-safe operation
 /// - Configurable pool size (coming soon)
-pub mod pool;
+pub(crate) mod pool;
 
 pub(crate) type Http1Connection = BaseHttpConnection<Http1Request, HttpBody, HttpBody>;
 #[cfg(feature = "http2")]
