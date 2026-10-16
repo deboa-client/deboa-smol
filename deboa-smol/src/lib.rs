@@ -30,12 +30,17 @@ compile_error!("HTTP2 requires native-tls or rust-tls support.");
 #[cfg(all(feature = "native-tls", feature = "http3"))]
 compile_error!("HTTP3 is not supported within native-tls runtime.");
 
-use deboa::InnerClient;
-
 use crate::{
     cert::{DeboaCertificate, DeboaIdentity},
     client::{dns::DefaultDnsResolver, http::conn::pool::HttpConnectionPool},
 };
+
+pub use deboa::form;
+pub use deboa::conn;
+pub use deboa::errors;
+pub use deboa::request;
+pub use deboa::response;
+pub use deboa::{ClientBuilder, InnerClient, HttpClient, Result};
 
 /// Certificate management module for handling SSL/TLS certificates.
 pub mod cert;
