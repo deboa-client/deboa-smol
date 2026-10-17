@@ -1,6 +1,6 @@
 [package]
 name = "deboa-smol"
-version = "0.1.4-beta.5"
+version = "0.1.4-beta.6"
 edition = "2024"
 authors = ["Rogerio Araújo <rogerio.araujo@gmail.com>"]
 repository = "https://github.com/ararog/deboa-smol"
@@ -36,7 +36,7 @@ default = [
 ]
 
 cookies = ["deboa/cookie"]
-multipart = ["deboa/multipart"]
+multipart = ["deboa-multipart/multi-threaded"]
 
 # tls
 rust-tls = [
@@ -80,9 +80,10 @@ websockets = ["deboa-ws"]
 [dependencies]
 async-native-tls-ext = { version = "0.6.0", optional = true, default-features = false }
 deboa.workspace = true
-deboa-h3 = { version = "0.1.3-beta.2", optional = true }
-deboa-tls = { version = "0.1.0-beta.4" }
-deboa-ws =  { version = "0.1.0-beta.4", optional = true }
+deboa-h3 = { version = "0.1.3-beta.3", optional = true }
+deboa-multipart = { version = "0.1.0-beta.1", optional = true }
+deboa-tls = { version = "0.1.0-beta.5" }
+deboa-ws =  { version = "0.1.0-beta.5", optional = true }
 futures = { version = "0.3.31", optional = true, default-features = false }
 futures-rustls = { version = "0.26.0", optional = true, default-features = false }
 futures-timeout = "0.2.1"
@@ -107,13 +108,16 @@ smol-macros = { version = "0.1.1", default-features = false }
 webpki-roots = { version = "1.0.6", optional = true, default-features = false }
 
 [dev-dependencies]
+bytes.workspace = true
 caramelo.workspace = true
+deboa-multipart = { version = "0.1.0-beta.1" }
 deboa-test-utils = { workspace = true }
 easyhttpmock-vetis-smol = { version = "0.1.2-beta.3", features = [
   "http2",
   "http3",
   "rust-tls",
 ], default-features = false }
+futures-util.workspace = true
 rstest.workspace = true
 smol = "2.0.2"
 time = { version = "0.3.53" }

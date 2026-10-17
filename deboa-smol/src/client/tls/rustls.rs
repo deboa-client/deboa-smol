@@ -1,17 +1,17 @@
 //! TLS implementation using rustls
 use crate::cert::{DeboaCertificate, DeboaIdentity};
 use deboa::{
-    errors::{ConnectionError, DeboaError},
     Result,
+    errors::{ConnectionError, DeboaError},
 };
 use rustls::{
-    pki_types::{CertificateDer, PrivateKeyDer},
     ClientConfig,
+    pki_types::{CertificateDer, PrivateKeyDer},
 };
 use std::sync::Arc;
 
 /// Builder for TLS connections using rustls
-pub struct TlsConnectionBuilder<'a> {
+pub(super) struct TlsConnectionBuilder<'a> {
     identity: Option<&'a DeboaIdentity>,
     certificate: Option<&'a DeboaCertificate>,
     skip_server_verification: bool,
@@ -31,31 +31,33 @@ impl Default for TlsConnectionBuilder<'_> {
 
 impl<'a> TlsConnectionBuilder<'a> {
     /// Set identity to use with connection
-    pub fn identity(mut self, identity: Option<&'a DeboaIdentity>) -> Self {
+    pub(super) fn identity(mut self, identity: Option<&'a DeboaIdentity>) -> Self {
         self.identity = identity;
         self
     }
 
     /// Set certificate to use with connection
-    pub fn certificate(mut self, certificate: Option<&'a DeboaCertificate>) -> Self {
+    pub(super) fn certificate(mut self, certificate: Option<&'a DeboaCertificate>) -> Self {
         self.certificate = certificate;
         self
     }
 
+    #[allow(unused)]
     /// Skip server verification
-    pub fn skip_server_verification(mut self, skip_server_verification: bool) -> Self {
+    pub(super) fn skip_server_verification(mut self, skip_server_verification: bool) -> Self {
         self.skip_server_verification = skip_server_verification;
         self
     }
 
+    #[allow(unused)]
     /// Set the ALPN protocols this client has support to
-    pub fn alpn(mut self, alpn: Vec<Vec<u8>>) -> Self {
+    pub(super) fn alpn(mut self, alpn: Vec<Vec<u8>>) -> Self {
         self.alpn = alpn;
         self
     }
 
     /// Build the TLS client configuration
-    pub fn build_config(self) -> Result<ClientConfig> {
+    pub(super) fn build_config(self) -> Result<ClientConfig> {
         let client_config = {
             if self.skip_server_verification {
                 ClientConfig::builder()
@@ -146,23 +148,23 @@ impl<'a> TlsConnectionBuilder<'a> {
 }
 
 /// TCP connection module for TLS
-pub mod tcp {
+pub(crate) mod tcp {
     use crate::{
         cert::{DeboaCertificate, DeboaIdentity},
         client::{http::conn::plain_stream_connect, tls::rustls::TlsConnectionBuilder},
         rt::stream::SmolStream,
     };
     use deboa::{
+        Result,
         conn::ConnectionConfig,
         errors::{ConnectionError, DeboaError},
-        Result,
     };
     use futures_rustls::TlsConnector;
     use rustls_pki_types::ServerName;
     use std::{net::IpAddr, sync::Arc};
 
     /// Connect to a TCP TLS stream
-    pub async fn connect<'a>(
+    pub(crate) async fn connect<'a>(
         ip: &IpAddr,
         config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
     ) -> Result<SmolStream> {
@@ -197,26 +199,26 @@ pub mod tcp {
 
 #[cfg(feature = "http3")]
 /// UDP connection module for TLS
-pub mod udp {
+pub(crate) mod udp {
     use crate::{
         cert::{DeboaCertificate, DeboaIdentity},
         client::tls::rustls::TlsConnectionBuilder,
     };
     use deboa::{
+        Result,
         conn::ConnectionConfig,
         errors::{ConnectionError, DeboaError},
-        Result,
     };
     use h3_quinn::Connection;
-    use quinn::crypto::rustls::QuicClientConfig;
     use quinn::Endpoint;
+    use quinn::crypto::rustls::QuicClientConfig;
     use std::{
         net::{IpAddr, SocketAddr},
         sync::Arc,
     };
 
     /// Connect to a Quic TLS stream
-    pub async fn connect<'a>(
+    pub(crate) async fn connect<'a>(
         ip: &IpAddr,
         config: &'a ConnectionConfig<'a, DeboaIdentity, DeboaCertificate>,
     ) -> Result<Connection> {

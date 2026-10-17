@@ -93,12 +93,12 @@ impl deboa::cert::Identity for DeboaIdentity {
         &self.cert
     }
 
-    fn key(&self) -> &Option<Vec<u8>> {
-        &self.key
+    fn key(&self) -> Option<&Vec<u8>> {
+        self.key.as_ref()
     }
 
-    fn encoding(&self) -> &Option<ContentEncoding> {
-        &self.encoding
+    fn encoding(&self) -> Option<&ContentEncoding> {
+        self.encoding.as_ref()
     }
 }
 
