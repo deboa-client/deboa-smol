@@ -610,13 +610,11 @@ dependencies = [
 name = "deboa-test-utils"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "caramelo",
  "ciborium",
  "deboa",
  "easyhttpmock",
  "fory",
- "futures",
  "http",
  "http-body-util",
  "mime",
